@@ -10,10 +10,13 @@ enum ReplCommand {
 }
 
 fn parse_repl_command(line: &str) -> ReplCommand {
-    match line.trim() {
-        "" => ReplCommand::Skip,
-        "exit" | "quit" => ReplCommand::Exit,
-        trimmed => ReplCommand::Send(trimmed.to_string()),
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        ReplCommand::Skip
+    } else if trimmed.eq_ignore_ascii_case("exit") || trimmed.eq_ignore_ascii_case("quit") {
+        ReplCommand::Exit
+    } else {
+        ReplCommand::Send(trimmed.to_string())
     }
 }
 
@@ -50,7 +53,9 @@ pub fn run_repl<C: ChatClient>(
     loop {
         match rl.readline(">> ") {
             Ok(line) => {
-                rl.add_history_entry(line.as_str())?;
+                if let Err(e) = rl.add_history_entry(line.as_str()) {
+                    eprintln!("warning: failed to record history: {e}");
+                }
                 match parse_repl_command(&line) {
                     ReplCommand::Exit => break,
                     ReplCommand::Skip => continue,
@@ -113,6 +118,9 @@ mod tests {
     fn parse_repl_command_classifies() {
         assert!(matches!(parse_repl_command("exit"), ReplCommand::Exit));
         assert!(matches!(parse_repl_command(" quit "), ReplCommand::Exit));
+        assert!(matches!(parse_repl_command("EXIT"), ReplCommand::Exit));
+        assert!(matches!(parse_repl_command("Exit"), ReplCommand::Exit));
+        assert!(matches!(parse_repl_command("QuIt"), ReplCommand::Exit));
         assert!(matches!(parse_repl_command(""), ReplCommand::Skip));
         assert!(matches!(parse_repl_command("   "), ReplCommand::Skip));
         match parse_repl_command(" list files ") {
