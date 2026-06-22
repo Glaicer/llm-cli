@@ -25,6 +25,19 @@ impl Config {
     pub fn parse(text: &str) -> Result<Self, ConfigError> {
         Ok(toml::from_str(text)?)
     }
+
+    pub fn default_with(base_url: String, model: String, api_key: String) -> Self {
+        Self {
+            base_url,
+            api_key,
+            model,
+            system_instruction: DEFAULT_SYSTEM_INSTRUCTION.to_string(),
+        }
+    }
+
+    pub fn to_toml(&self) -> Result<String, ConfigError> {
+        Ok(toml::to_string_pretty(self).map_err(ConfigError::Write)?)
+    }
 }
 
 use std::path::PathBuf;
@@ -59,6 +72,70 @@ pub fn apply_env_overrides(mut cfg: Config) -> Config {
         }
     }
     cfg
+}
+
+use std::io::{self, BufRead, Write};
+
+pub enum LoadOutcome {
+    Loaded(Config),
+    Created,
+}
+
+pub fn write_config(path: &PathBuf, cfg: &Config) -> Result<(), ConfigError> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let text = cfg.to_toml()?;
+    std::fs::write(path, text)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(())
+}
+
+pub fn load() -> Result<LoadOutcome, ConfigError> {
+    let Some(path) = config_path() else {
+        return Err(ConfigError::Read(io::Error::new(
+            io::ErrorKind::NotFound,
+            "no config directory found on this platform",
+        )));
+    };
+    if path.exists() {
+        let cfg = load_from_file(&path)?;
+        Ok(LoadOutcome::Loaded(apply_env_overrides(cfg)))
+    } else {
+        run_first_run_setup(&path)?;
+        Ok(LoadOutcome::Created)
+    }
+}
+
+fn run_first_run_setup(path: &PathBuf) -> Result<(), ConfigError> {
+    println!("No config found at {}.", path.display());
+    println!("Let's create one.\n");
+    let base_url = prompt("Base URL (OpenAI-compatible, e.g. https://api.openai.com/v1): ")?;
+    let model = prompt("Model id (e.g. gpt-4o-mini): ")?;
+    let api_key = prompt("API key: ")?;
+    let cfg = Config::default_with(
+        base_url.trim().to_string(),
+        model.trim().to_string(),
+        api_key.trim().to_string(),
+    );
+    write_config(path, &cfg)?;
+    println!("\nConfig written to {}.", path.display());
+    println!(
+        "The default system instruction has been set. Edit the file if needed, then re-run `llm`."
+    );
+    Ok(())
+}
+
+fn prompt(question: &str) -> Result<String, ConfigError> {
+    print!("{}", question);
+    io::stdout().flush()?;
+    let mut line = String::new();
+    io::stdin().lock().read_line(&mut line)?;
+    Ok(line.trim_end().to_string())
 }
 
 #[cfg(test)]
@@ -129,5 +206,37 @@ system_instruction = "be brief"
         let cfg = load_from_file(&path).unwrap();
         assert_eq!(cfg.model, "m");
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn default_with_sets_default_instruction() {
+        let cfg = Config::default_with("u".into(), "m".into(), "k".into());
+        assert_eq!(cfg.system_instruction, DEFAULT_SYSTEM_INSTRUCTION);
+    }
+
+    #[test]
+    fn to_toml_roundtrips() {
+        let cfg = Config::default_with("https://e/v1".into(), "gpt".into(), "sk".into());
+        let text = cfg.to_toml().unwrap();
+        let back = Config::parse(&text).unwrap();
+        assert_eq!(cfg, back);
+    }
+
+    #[test]
+    fn write_config_creates_file_with_permissions() {
+        let dir = std::env::temp_dir().join(format!("llm-cli-w-{}", std::process::id()));
+        let path = dir.join("nested").join("config.toml");
+        let cfg = Config::default_with("u".into(), "m".into(), "k".into());
+        write_config(&path, &cfg).unwrap();
+        assert!(path.exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600);
+        }
+        let back = load_from_file(&path).unwrap();
+        assert_eq!(back, cfg);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
