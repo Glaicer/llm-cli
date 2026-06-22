@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::io::{self, BufRead, Write};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 pub const DEFAULT_SYSTEM_INSTRUCTION: &str = "You are an AI CLI assistant. Your answers should be short and concise. If the user asks for command, output just command without any comments.";
@@ -40,8 +42,6 @@ impl Config {
     }
 }
 
-use std::path::{Path, PathBuf};
-
 const ENV_API_KEY: &str = "LLM_CLI_API_KEY";
 const ENV_BASE_URL: &str = "LLM_CLI_BASE_URL";
 const ENV_MODEL: &str = "LLM_CLI_MODEL";
@@ -73,8 +73,6 @@ pub fn apply_env_overrides(mut cfg: Config) -> Config {
     }
     cfg
 }
-
-use std::io::{self, BufRead, Write};
 
 pub enum LoadOutcome {
     Loaded(Config),
@@ -114,14 +112,17 @@ pub fn load() -> Result<LoadOutcome, ConfigError> {
 fn run_first_run_setup(path: &Path) -> Result<(), ConfigError> {
     println!("No config found at {}.", path.display());
     println!("Let's create one.\n");
-    let base_url = prompt("Base URL (OpenAI-compatible, e.g. https://api.openai.com/v1): ")?;
-    let model = prompt("Model id (e.g. gpt-4o-mini): ")?;
-    let api_key = prompt("API key: ")?;
-    let cfg = Config::default_with(
-        base_url.trim().to_string(),
-        model.trim().to_string(),
-        api_key.trim().to_string(),
-    );
+    let stdin = io::stdin();
+    let mut reader = stdin.lock();
+    let mut writer = io::stdout();
+    let base_url = prompt_required(
+        &mut reader,
+        &mut writer,
+        "Base URL (OpenAI-compatible, e.g. https://api.openai.com/v1): ",
+    )?;
+    let model = prompt_required(&mut reader, &mut writer, "Model id (e.g. gpt-4o-mini): ")?;
+    let api_key = prompt_required(&mut reader, &mut writer, "API key: ")?;
+    let cfg = Config::default_with(base_url, model, api_key);
     write_config(path, &cfg)?;
     println!("\nConfig written to {}.", path.display());
     println!(
@@ -130,12 +131,22 @@ fn run_first_run_setup(path: &Path) -> Result<(), ConfigError> {
     Ok(())
 }
 
-fn prompt(question: &str) -> Result<String, ConfigError> {
-    print!("{}", question);
-    io::stdout().flush()?;
-    let mut line = String::new();
-    io::stdin().lock().read_line(&mut line)?;
-    Ok(line.trim_end().to_string())
+fn prompt_required(
+    reader: &mut impl BufRead,
+    writer: &mut impl Write,
+    question: &str,
+) -> Result<String, ConfigError> {
+    loop {
+        write!(writer, "{}", question)?;
+        writer.flush()?;
+        let mut line = String::new();
+        reader.read_line(&mut line)?;
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.to_string());
+        }
+        writeln!(writer, "This field is required.")?;
+    }
 }
 
 #[cfg(test)]
@@ -220,6 +231,18 @@ system_instruction = "be brief"
         let text = cfg.to_toml().unwrap();
         let back = Config::parse(&text).unwrap();
         assert_eq!(cfg, back);
+    }
+
+    #[test]
+    fn prompt_required_reprompts_on_empty() {
+        let input = b"\n  \n\nhttps://api.openai.com/v1\n";
+        let mut reader = std::io::Cursor::new(&input[..]);
+        let mut writer: Vec<u8> = Vec::new();
+        let result = prompt_required(&mut reader, &mut writer, "URL: ").unwrap();
+        assert_eq!(result, "https://api.openai.com/v1");
+        let out = String::from_utf8(writer).unwrap();
+        assert!(out.contains("URL:"));
+        assert!(out.contains("This field is required."));
     }
 
     #[test]
