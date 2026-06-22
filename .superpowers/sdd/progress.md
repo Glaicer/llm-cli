@@ -20,4 +20,14 @@
 
 ## Task Status
 
-(Each entry: `Task N: complete (commits <base7>..<head7>, review clean)` — appended as tasks finish.)
+- Task 1: complete (commits 3f74e81..1b6660f, review clean)
+- Task 2: complete (commits 1b6660f..5ff55f6, review clean). Plan command note: brief uses `cargo test --lib` but the crate is binary-only (no src/lib.rs). Accepted substitution: use `cargo test <module>` (e.g. `cargo test config`) for all tasks. Applied to future dispatches.
+- Task 3: complete (commits 5ff55f6..b27905a, review clean).
+- Task 4: complete (commits b27905a..1a164b7, review clean).
+- Task 5: complete (commits 1a164b7..9ab9e38, review clean).
+- Task 6: complete (commits 9ab9e38..32edb7c, review clean).
+- Task 7: complete (commits 32edb7c..f5eac54, review clean).
+- Task 8: complete (commits f5eac54..93e74de, review clean).
+- Task 9: complete (commits 93e74de..ed06830, review clean). Includes `&PathBuf → &Path` sweep and `to_toml` clippy fix in `src/config.rs` to pass `cargo clippy -- -D warnings`.
+- Final whole-branch review: Ready to merge. No Critical/Important issues; 7 Minor polish items (use-statement consolidation, HTTP timeout, empty-input prompts, case-insensitive exit, history error handling, AppError enum, optional README/zeroize) all outside spec scope.
+- Polish pass: complete (commits ed06830..6075c3d, 4 commits). Items 1-6 implemented: consolidated `use` block + `prompt_required` with TDD test (config), 60s HTTP timeout with `unwrap_or_else` fallback (client), case-insensitive `exit`/`quit` with TDD assertions + non-fatal history errors (repl), `AppError::MissingPrompt` (main). 17/17 tests passing, clippy clean. Item 7 (README/zeroize/wiremock) explicitly skipped per user scope.
