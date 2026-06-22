@@ -36,11 +36,11 @@ impl Config {
     }
 
     pub fn to_toml(&self) -> Result<String, ConfigError> {
-        Ok(toml::to_string_pretty(self).map_err(ConfigError::Write)?)
+        toml::to_string_pretty(self).map_err(ConfigError::Write)
     }
 }
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const ENV_API_KEY: &str = "LLM_CLI_API_KEY";
 const ENV_BASE_URL: &str = "LLM_CLI_BASE_URL";
@@ -50,7 +50,7 @@ pub fn config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("llm-cli").join("config.toml"))
 }
 
-pub fn load_from_file(path: &PathBuf) -> Result<Config, ConfigError> {
+pub fn load_from_file(path: &Path) -> Result<Config, ConfigError> {
     let text = std::fs::read_to_string(path)?;
     Config::parse(&text)
 }
@@ -81,7 +81,7 @@ pub enum LoadOutcome {
     Created,
 }
 
-pub fn write_config(path: &PathBuf, cfg: &Config) -> Result<(), ConfigError> {
+pub fn write_config(path: &Path, cfg: &Config) -> Result<(), ConfigError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -111,7 +111,7 @@ pub fn load() -> Result<LoadOutcome, ConfigError> {
     }
 }
 
-fn run_first_run_setup(path: &PathBuf) -> Result<(), ConfigError> {
+fn run_first_run_setup(path: &Path) -> Result<(), ConfigError> {
     println!("No config found at {}.", path.display());
     println!("Let's create one.\n");
     let base_url = prompt("Base URL (OpenAI-compatible, e.g. https://api.openai.com/v1): ")?;
