@@ -1,5 +1,6 @@
 use crate::chat::{build_payload, extract_content, Message};
 use crate::config::Config;
+use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -25,8 +26,12 @@ pub struct ReqwestClient {
 
 impl ReqwestClient {
     pub fn new(cfg: &Config) -> Self {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(60))
+            .build()
+            .unwrap_or_else(|_| reqwest::blocking::Client::new());
         Self {
-            client: reqwest::blocking::Client::new(),
+            client,
             base_url: cfg.base_url.trim_end_matches('/').to_string(),
             api_key: cfg.api_key.clone(),
             model: cfg.model.clone(),
