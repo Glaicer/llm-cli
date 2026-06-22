@@ -9,6 +9,7 @@ use clap::Parser;
 use cli::Args;
 use client::ReqwestClient;
 use config::LoadOutcome;
+use thiserror::Error;
 
 fn main() {
     if let Err(e) = run() {
@@ -26,9 +27,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let client = ReqwestClient::new(&cfg);
 
     if args.single {
-        let prompt = args.prompt.ok_or_else(|| -> Box<dyn std::error::Error> {
-            "single mode requires a prompt".into()
-        })?;
+        let prompt = args.prompt.ok_or(AppError::MissingPrompt)?;
         let mut conv = Conversation::new(&cfg.system_instruction);
         let content = repl::turn(&mut conv, &client, &prompt)?;
         println!("{content}");
@@ -37,4 +36,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         repl::run_repl(conv, &client, args.prompt)?;
     }
     Ok(())
+}
+
+#[derive(Debug, Error)]
+enum AppError {
+    #[error("single mode requires a prompt")]
+    MissingPrompt,
 }
