@@ -1,5 +1,7 @@
 use crate::chat::Conversation;
 use crate::client::{ChatClient, ClientError};
+use rustyline::error::ReadlineError;
+use rustyline::DefaultEditor;
 
 enum ReplCommand {
     Exit,
@@ -31,6 +33,45 @@ pub fn turn<C: ChatClient>(
             Err(e)
         }
     }
+}
+
+pub fn run_repl<C: ChatClient>(
+    mut conv: Conversation,
+    client: &C,
+    initial: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut rl = DefaultEditor::new()?;
+    if let Some(first) = initial {
+        match turn(&mut conv, client, &first) {
+            Ok(content) => println!("{content}"),
+            Err(e) => eprintln!("error: {e}"),
+        }
+    }
+    loop {
+        match rl.readline(">> ") {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str())?;
+                match parse_repl_command(&line) {
+                    ReplCommand::Exit => break,
+                    ReplCommand::Skip => continue,
+                    ReplCommand::Send(text) => match turn(&mut conv, client, &text) {
+                        Ok(content) => println!("{content}"),
+                        Err(e) => eprintln!("error: {e}"),
+                    },
+                }
+            }
+            Err(ReadlineError::Interrupted) => {
+                println!();
+                break;
+            }
+            Err(ReadlineError::Eof) => break,
+            Err(e) => {
+                eprintln!("error: {e}");
+                break;
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
