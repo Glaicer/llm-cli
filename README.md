@@ -1,82 +1,113 @@
-# llm-cli
+# llm
 
-Quick AI answers from the terminal, using any OpenAI-compatible Chat Completions
-endpoint.
+A blazing fast, single-binary CLI for chatting with any OpenAI-compatible LLM from your terminal. No runtime dependencies. No Docker. No Node. Just a **10 MB** binary that works on any Linux machine.
 
 ```
 $ llm -s "What command shall I use to see all files and folders including hidden ones"
 ls -la
 ```
 
+> **macOS and Windows releases coming soon.**
+
 ## Install
 
 ```sh
-cargo install --path .
+wget ... | bash
 ```
 
-The binary is installed as `llm`.
+That's it. The `llm` binary is dropped into `~/.local/bin`. Make sure it's in your `PATH`:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+```
 
 ## Usage
 
-**Single shot** (`-s` / `--single`): one request, print the answer, exit.
+**Single shot** — one question, one answer, done:
 
 ```sh
 llm -s "Explain the difference between TCP and UDP"
 ```
 
-**Interactive REPL** (default): opens a multi-turn conversation. Pass an
-optional initial prompt to seed it, then keep typing at the `>> ` prompt.
+**Interactive mode** — multi-turn conversation with full context memory:
 
 ```sh
-llm "What command lists all files"
+$ llm
+>> What command lists all files
 ls
 >> And hidden ones
 ls -la
 >> exit
 ```
 
-REPL commands:
+You can also seed the conversation with an initial prompt:
 
-- `exit` / `quit` (case-insensitive) — leave the REPL
-- `Ctrl-D` — leave the REPL
-- `Ctrl-C` — leave the REPL
-- empty line — skipped, no request sent
+```sh
+llm "What is the capital of France"
+```
 
-## First run
+**REPL commands:** `exit`, `quit`, `Ctrl-D`, or `Ctrl-C` to leave.
 
-If no config exists, `llm` prompts for the base URL, model id, and API key,
-writes `~/.config/llm-cli/config.toml` (mode `0600` on Unix) with a default
-system instruction, prints a message, and exits. Re-run `llm` to start.
+## Config
 
-## Configuration
+On first run, `llm` walks you through setup interactively — base URL, model, and API key. The config is saved to:
 
-Config file: `$XDG_CONFIG_HOME/llm-cli/config.toml`
-(or `~/.config/llm-cli/config.toml`)
+```
+~/.config/llm-cli/config.toml
+```
+
+Edit it directly to change settings:
 
 ```toml
 base_url = "https://api.openai.com/v1"
 api_key = "sk-..."
-model = "gpt-4o-mini"
+model = "gpt-5.4-mini"
 system_instruction = "You are an AI CLI assistant. Your answers should be short and concise. If the user asks for command, output just command without any comments."
 ```
 
-### Environment overrides
+| Option | Description |
+|---|---|
+| `base_url` | Any OpenAI-compatible API endpoint (OpenAI, Ollama, LM Studio, vLLM, etc.) |
+| `api_key` | Bearer token for authentication |
+| `model` | Model ID accepted by your endpoint (e.g. `gpt-4o-mini`, `claude-opus-4`) |
+| `system_instruction` | System prompt prepended to every conversation |
 
-Non-empty values for any of these environment variables override the file value:
-
-- `LLM_CLI_API_KEY`
-- `LLM_CLI_BASE_URL`
-- `LLM_CLI_MODEL`
+**Environment overrides** — set these to override the config file without editing it:
 
 ```sh
-LLM_CLI_MODEL=claude-opus-4 llm -s "hi"
+LLM_CLI_API_KEY=sk-...
+LLM_CLI_BASE_URL=
+LLM_CLI_MODEL=
 ```
 
-## Errors
+## Uninstall
 
-Provider errors (non-2xx, network failures, malformed responses) are printed to
-stderr. In single mode they exit with code 1; in the REPL they print and the
-session continues.
+Remove the binary:
+
+```sh
+rm ~/.local/bin/llm
+```
+
+Remove the config:
+
+```sh
+rm -r ~/.config/llm-cli
+```
+
+## Development
+
+```sh
+git clone repo
+cd llm-cli
+cargo build
+cargo test
+```
+
+The binary is built at `target/debug/llm`. For a release build:
+
+```sh
+cargo build --release
+```
 
 ## License
 
