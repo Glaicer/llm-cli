@@ -1,6 +1,8 @@
-# llm
+# llm-cli
 
 A blazing fast, single-binary CLI for chatting with any OpenAI-compatible LLM from your terminal. No runtime dependencies. No Docker. No Node. Just a **10 MB** binary that works on any Linux machine.
+
+Heavily inspired by simonw/LLM but but built for people who want something simpler.
 
 ```
 $ llm -s "What command shall I use to see all files and folders including hidden ones"
@@ -12,7 +14,7 @@ ls -la
 ## Install
 
 ```sh
-wget ... | bash
+wget -qO- https://raw.githubusercontent.com/Glaicer/llm-cli/main/install.sh | bash
 ```
 
 That's it. The `llm` binary is dropped into `~/.local/bin`. Make sure it's in your `PATH`:
